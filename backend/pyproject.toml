@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "restora-backend"
+version = "0.1.0"
+description = "Restora OS Backend API"
+authors = ["Admin <admin@restora.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.30.0"}
+sqlalchemy = "^2.0.30"
+asyncpg = "^0.29.0"
+alembic = "^1.13.0"
+pydantic = "^2.7.0"
+pydantic-settings = "^2.2.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+redis = "^5.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
