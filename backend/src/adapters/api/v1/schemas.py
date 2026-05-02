@@ -24,12 +24,12 @@ class ProductBase(BaseModel):
     image_url: Optional[str] = None
     category_id: UUID
     prep_time_min: int = 10
+    tags: Optional[List[str]] = []
 
 class ProductResponse(ProductBase):
     id: UUID
     restaurant_id: UUID
     is_available: bool
-    tags: Optional[List[str]] = []
     class Config:
         from_attributes = True
 
@@ -80,7 +80,7 @@ class OrderItemResponse(BaseModel):
 class OrderResponse(BaseModel):
     id: UUID
     restaurant_id: UUID
-    table_id: UUID
+    table_id: Optional[UUID] = None
     waiter_id: UUID
     order_number: Optional[int] = None
     status: str
@@ -103,6 +103,7 @@ class CompanyCreate(BaseModel):
 
 class CompanyResponse(CompanyCreate):
     id: UUID
+    slug: Optional[str] = None
     status: str
     class Config:
         from_attributes = True
@@ -153,3 +154,56 @@ class InvoiceResponse(BaseModel):
 class DiscountCreate(BaseModel):
     pin: str
     discount_amount: float
+
+# --- SCHEMAS FOR REPORTS ---
+class DashboardStats(BaseModel):
+    today_revenue: float
+    today_orders: int
+    customers_today: int
+    avg_ticket: float
+    revenue_growth: float # Porcentaje vs ayer
+    top_products: List[Any]
+    waiter_ranking: List[Any]
+
+class SalesSummary(BaseModel):
+    date: str
+    revenue: float
+    orders: int
+
+class WaiterPerformance(BaseModel):
+    waiter_name: str
+    total_sales: float
+    orders_count: int
+
+class ProductSales(BaseModel):
+    product_name: str
+    quantity: int
+    total_revenue: float
+
+# --- SCHEMAS FOR USERS ---
+class UserBase(BaseModel):
+    full_name: str
+    email: str
+    role: str # superadmin, admin_empresa, gerente, cajero, mesero, cocina
+    is_active: bool = True
+
+class UserCreate(UserBase):
+    password: str
+    pin_code: Optional[str] = None
+    company_id: Optional[UUID] = None
+    restaurant_id: Optional[UUID] = None
+
+class UserResponse(UserBase):
+    id: UUID
+    company_id: Optional[UUID] = None
+    restaurant_id: Optional[UUID] = None
+    class Config:
+        from_attributes = True
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class PinLogin(BaseModel):
+    pin: str
+    restaurant_id: UUID

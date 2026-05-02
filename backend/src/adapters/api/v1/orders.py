@@ -156,6 +156,24 @@ async def close_order(order_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Order not found")
         
     order.status = 'delivered'
+    
+    # Liberar mesa y notificar
+    if order.table_id:
+        stmt_table = select(TableModel).where(TableModel.id == order.table_id)
+        res_table = await db.execute(stmt_table)
+        table = res_table.scalars().first()
+        if table:
+            table.status = 'available'
+            # Broadcast mesa libre
+            from .websockets.kitchen_ws import notify_table_freed
+            import json
+            try:
+                await notify_table_freed(str(order.restaurant_id), json.dumps({
+                    "type": "table_freed", "table_id": str(table.id), "table_name": table.name
+                }))
+            except Exception:
+                pass
+    
     await db.commit()
     return {"message": "Order closed successfully"}
 
@@ -305,19 +323,27 @@ async def mark_item_ready(order_id: str, item_id: str, db: AsyncSession = Depend
     
     await db.commit()
     
-    # Notify KDS via WebSocket
-    from .websockets.kitchen_ws import notify_kitchen_new_order
+    all_ready = all(i.status == 'ready' for i in all_items)
+    
+    # Notify KDS + Waiter via WebSocket
+    from .websockets.kitchen_ws import notify_kitchen_new_order, notify_waiter_order_ready
     import json
     try:
         stmt_o = select(OrderModel).where(OrderModel.id == order_id)
         res_o = await db.execute(stmt_o)
         order = res_o.scalars().first()
-        msg = json.dumps({"type": "item_ready", "order_id": order_id, "item_id": item_id, "all_ready": all(i.status == 'ready' for i in all_items)})
-        await notify_kitchen_new_order(str(order.restaurant_id) if order else "", msg)
+        rest_id = str(order.restaurant_id) if order else ""
+        
+        msg = json.dumps({"type": "item_ready", "order_id": order_id, "item_id": item_id, "all_ready": all_ready})
+        await notify_kitchen_new_order(rest_id, msg)
+        
+        # Notificar al mesero
+        waiter_msg = json.dumps({"type": "item_ready", "order_id": order_id, "item_name": item.product_name, "all_ready": all_ready})
+        await notify_waiter_order_ready(rest_id, waiter_msg)
     except Exception:
         pass
     
-    return {"message": "Item marked as ready", "item_id": item_id, "all_ready": all(i.status == 'ready' for i in all_items)}
+    return {"message": "Item marked as ready", "item_id": item_id, "all_ready": all_ready}
 
 # ─── MARK ENTIRE ORDER AS READY ───────────────────────
 @router.patch("/{order_id}/ready")
@@ -337,12 +363,17 @@ async def mark_order_ready(order_id: str, db: AsyncSession = Depends(get_db)):
     order.status = 'ready'
     await db.commit()
     
-    # Notify via WebSocket
-    from .websockets.kitchen_ws import notify_kitchen_new_order
+    # Notify Kitchen + Waiter via WebSocket
+    from .websockets.kitchen_ws import notify_kitchen_new_order, notify_waiter_order_ready
     import json
     try:
+        rest_id = str(order.restaurant_id)
         msg = json.dumps({"type": "order_ready", "order_id": order_id})
-        await notify_kitchen_new_order(str(order.restaurant_id), msg)
+        await notify_kitchen_new_order(rest_id, msg)
+        
+        # Notificar al mesero que TODA su comanda esta lista
+        waiter_msg = json.dumps({"type": "order_ready", "order_id": order_id, "message": "Tu comanda completa esta lista para entregar!"})
+        await notify_waiter_order_ready(rest_id, waiter_msg)
     except Exception:
         pass
     

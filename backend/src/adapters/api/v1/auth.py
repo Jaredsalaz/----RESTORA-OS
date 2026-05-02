@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 import bcrypt
 from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -8,6 +9,8 @@ from src.adapters.persistence.database import get_db
 from src.adapters.persistence.models.models import UserModel, ShiftModel
 from src.shared.security.jwt_handler import create_access_token, create_refresh_token, verify_token
 from src.shared.security.dependencies import get_current_user
+from src.adapters.api.v1.schemas import RestaurantResponse
+from src.adapters.persistence.models.models import RestaurantModel
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -18,6 +21,23 @@ class LoginRequest(BaseModel):
 class PinLoginRequest(BaseModel):
     pin: str
     restaurant_id: str
+
+@router.get("/restaurants", response_model=list[RestaurantResponse])
+async def get_public_restaurants(company_slug: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    """Endpoint público para listar sucursales en la pantalla de login de meseros"""
+    from src.adapters.persistence.models.models import CompanyModel
+    
+    if company_slug:
+        company_res = await db.execute(select(CompanyModel).where(CompanyModel.slug == company_slug))
+        company = company_res.scalars().first()
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+        stmt = select(RestaurantModel).where(RestaurantModel.company_id == company.id)
+    else:
+        stmt = select(RestaurantModel)
+        
+    res = await db.execute(stmt)
+    return res.scalars().all()
 
 @router.post("/login")
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
@@ -33,7 +53,12 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid credentials")
         
-    token_data = {"sub": str(user.id), "role": user.role, "restaurant_id": str(user.restaurant_id) if user.restaurant_id else None}
+    token_data = {
+        "sub": str(user.id), 
+        "role": user.role, 
+        "restaurant_id": str(user.restaurant_id) if user.restaurant_id else None,
+        "company_id": str(user.company_id) if user.company_id else None
+    }
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
     

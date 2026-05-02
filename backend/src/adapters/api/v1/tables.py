@@ -36,3 +36,30 @@ async def create_table(table: TableBase, restaurant_id: str, db: AsyncSession = 
     await db.commit()
     await db.refresh(db_table)
     return db_table
+
+@router.put("/{table_id}", response_model=TableResponse)
+async def update_table(table_id: str, table_data: TableBase, db: AsyncSession = Depends(get_db)):
+    stmt = select(TableModel).where(TableModel.id == table_id)
+    result = await db.execute(stmt)
+    db_table = result.scalars().first()
+    if not db_table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    for key, value in table_data.model_dump().items():
+        setattr(db_table, key, value)
+        
+    await db.commit()
+    await db.refresh(db_table)
+    return db_table
+
+@router.delete("/{table_id}")
+async def delete_table(table_id: str, db: AsyncSession = Depends(get_db)):
+    stmt = select(TableModel).where(TableModel.id == table_id)
+    result = await db.execute(stmt)
+    db_table = result.scalars().first()
+    if not db_table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    await db.delete(db_table)
+    await db.commit()
+    return {"message": "Table deleted successfully"}

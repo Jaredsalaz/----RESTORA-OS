@@ -53,9 +53,11 @@ class CompanyModel(Base):
     __tablename__ = "companies"
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     name = Column(String(200), nullable=False)
+    slug = Column(String(100), unique=True)
     rfc = Column(String(20))
     plan = Column(String(50), default='starter')
     status = Column(String(20), default='active')
+    created_at = Column(DateTime, server_default=func.now())
 
 class RestaurantModel(Base):
     __tablename__ = "restaurants"
@@ -68,6 +70,7 @@ class RestaurantModel(Base):
 class UserModel(Base):
     __tablename__ = "users"
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"))
     restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"))
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(Text, nullable=False)

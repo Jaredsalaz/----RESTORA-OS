@@ -8,6 +8,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
+from fastapi.staticfiles import StaticFiles
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -15,6 +17,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 from starlette.middleware.base import BaseHTTPMiddleware
 # from src.shared.security.rate_limiter import rate_limit_middleware
