@@ -324,8 +324,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     try {
       const res = await apiClient.post(`/payments/orders/${activeOrderId}/pay`, payload);
       set({ isSending: false });
-      // La mesa ya se liberó, recargamos la comanda para vaciarla
-      get().clearOrder();
+      // El clearOrder se hará en el onSuccess del modal para permitir ver el ticket
       return { success: true, invoiceId: res.data.id };
     } catch (err: any) {
       console.error('Error al procesar pago:', err);

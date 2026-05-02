@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
-import { LayoutGrid, UtensilsCrossed, ClipboardList, LogOut } from 'lucide-react';
+import { LayoutGrid, UtensilsCrossed, ClipboardList, LogOut, Wifi, WifiOff } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRestaurantSocket } from '../../hooks/useRestaurantSocket';
 import TablesView from './views/TablesView';
 import MenuView from './views/MenuView';
 import OrderSidebar from './views/OrderSidebar';
@@ -8,7 +10,35 @@ import LoginView from './views/LoginView';
 
 export default function WaiterApp() {
   const location = useLocation();
+  const queryClient = useQueryClient();
   const token = localStorage.getItem('access_token');
+  
+  // Extraer restaurantId del token
+  let restaurantId = '';
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      restaurantId = payload.restaurant_id;
+    } catch (e) {
+      console.error('Error decoding token', e);
+    }
+  }
+
+  // Socket para actualizaciones en tiempo real
+  const { status } = useRestaurantSocket({
+    restaurantId,
+    channel: 'orders',
+    enabled: !!restaurantId,
+    onMessage: (data) => {
+      console.log('[Waiter-WS] Mensaje recibido:', data);
+      // Al recibir cualquier actualización de orden o mesa, invalidamos los queries para refrescar UI
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order-history'] });
+    }
+  });
+
+  const isConnected = status === 'connected';
 
   // Si no hay token y no está en la página de login, redirigir
   if (!token && !location.pathname.endsWith('/login')) {
@@ -33,8 +63,12 @@ export default function WaiterApp() {
       
       {/* Sidebar de navegación rápida */}
       <aside className="w-24 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col items-center py-8 shrink-0 z-20">
-        <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-blue-500/30 mb-8">
+        <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-blue-500/30 mb-2">
           R
+        </div>
+        <div className={`mb-8 flex items-center gap-1 text-[8px] font-black uppercase tracking-tighter ${isConnected ? 'text-emerald-500' : 'text-rose-500 animate-pulse'}`}>
+          {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
+          {isConnected ? 'Online' : 'Offline'}
         </div>
         
         <nav className="flex flex-col gap-4 w-full px-4">
